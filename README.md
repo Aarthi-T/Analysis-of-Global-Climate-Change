@@ -6,8 +6,8 @@ View the analysis here: https://sites.google.com/view/climatechangeaftermath/hom
 
 
 Tools Used:
-R - Data Cleaning, tranformation and visualizations.
-R Shiny
-Flourish
-Datawrapper
-Google sites
+1. R - Data Cleaning, transformation and visualizations.
+2. R Shiny
+3. Flourish
+4. Datawrapper
+5. Google sites
