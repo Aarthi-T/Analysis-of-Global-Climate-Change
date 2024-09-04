@@ -1,0 +1,90 @@
+---
+title: "Proj_1_Natural_diasasters"
+output: html_document
+date: "2023-03-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea")
+```
+
+```{r Libraries, include=TRUE}
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+library(gridExtra)
+library(tidyverse)
+library(lubridate)
+library(RColorBrewer)
+library(ggfittext)
+library(treemapify)
+library(plotly)
+library(highcharter)
+library(treemap)
+library(shiny)
+library(leaflet)
+library(choroplethr)
+library(gapminder)
+library(maps)
+library(countrycode)
+library(echarts4r)
+library(htmlwidgets)
+library(gfonts)
+library(extrafont)
+```
+
+
+
+```{r Dataset, include=FALSE}
+natural_disasters <- read.csv("all_natural_disasters.csv")
+```
+
+
+```{r  task1, echo=FALSE}
+library(shiny)
+library(ggplot2)
+library(dplyr)
+
+natural_disasters_subset <- natural_disasters %>%
+  select(Year,Disaster.Type,Continent) %>%
+  group_by(Year,Disaster.Type,Continent) %>%
+  summarise("Count_of_disasters" = n())
+
+ui <- fluidPage(
+
+  #Header
+  h1("Number of natural disasters from 1990 to Present"),
+
+  selectInput(
+    inputId = "region",
+    label = "Select region",
+    choices = unique(natural_disasters_subset$Continent),
+    selected = "Americas"
+  ),
+
+  plotlyOutput("plot")
+)
+
+
+server <- function(input, output) {
+  
+selectedregion <- reactive({
+      input$region
+      })
+
+  output$plot <- renderPlotly({
+    natural_disasters_subset %>%
+      filter(Continent == selectedregion()) %>%
+      plot_ly(x= ~Year, y= ~Count_of_disasters, color = ~Disaster.Type,type = 'scatter', mode = 'markers',
+              text = ~paste("Disaster Type:",Disaster.Type, "<br>Year:", Year,"<br>Count:" ,Count_of_disasters),
+              marker = list(size = 10,
+                             line = list(width = 2))) %>%
+      layout(yaxis = list(title="Number of Disasters"),
+         xaxis = list(title = "Year"))
+      
+  })
+
+}
+shinyApp(ui, server)
+```

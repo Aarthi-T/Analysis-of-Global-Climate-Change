@@ -1,0 +1,532 @@
+---
+title: "Project_1"
+output: html_document
+date: "2023-03-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea")
+```
+
+
+```{r Libraries, include=TRUE}
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+library(gridExtra)
+library(tidyverse)
+library(lubridate)
+library(RColorBrewer)
+library(ggfittext)
+library(treemapify)
+library(plotly)
+library(highcharter)
+library(treemap)
+library(shiny)
+library(leaflet)
+library(choroplethr)
+library(gapminder)
+library(maps)
+library(countrycode)
+library(echarts4r)
+library(htmlwidgets)
+library(gfonts)
+library(extrafont)
+setup_font(
+  id = "roboto",
+  output_dir = "/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/app",
+  variants = "regular"
+)
+```
+
+
+```{r Dataset, include=FALSE}
+# loading the Hospital General Information Dataset
+temp_change_df <- read.csv('GlobalLandTemperaturesByState.csv')
+temp <- read.csv('FAOSTAT_data_en_3-1-2023.csv')
+states_codes <- read.csv('state_codes.csv')
+antar_ice <- read.csv("antarctica_mass.csv")
+sea_level <- read.csv("sea_level.csv")
+fossil_fuel_consumption <- read.csv("annual-change-fossil-fuels.csv")
+fuel_production <- read.csv("data.csv")
+co2_emissions <- read.csv("annual-co2-emissions-per-country.csv")
+gdp_change <- read.csv("US_GDP_change.csv")
+deforest_change <- read.csv("share-global-deforestation.csv")
+food_production <- read.csv("Food_Production.csv")
+ghg_emission <- read.csv("ghg-emissions-by-sector.csv")
+methane_emission <- read.csv("methane-emissions-by-sector.csv")
+no2_emission <- read.csv("nitrous-oxide-emissions-by-sector.csv")
+#beef_prod <- read.csv("beef-and-buffalo-meat-production-tonnes.csv")
+#milk_prod <- read.csv("FAOSTAT_milk_prod.csv")
+natural_disasters <- read.csv("all_natural_disasters.csv")
+death_by_disease <- read.csv("number-of-deaths-by-risk-factor.csv")
+```
+
+
+```{r task1, echo=FALSE}
+
+#Working code
+
+library(echarts4r)
+map <- temp_change_df %>%
+  group_by(Year) %>%
+  e_charts(Country, timeline = TRUE) %>%
+  e_map(AvgTemperature) %>%
+  e_timeline_opts(autoPlay = TRUE) %>%
+  e_visual_map(min= -10, max= 28,
+               type = 'continuous') %>%
+  e_title("Life expectancy by country and year", left = "center") %>%
+  e_tooltip(
+    trigger = "item",
+    formatter = e_tooltip_choro_formatter())
+  e_animation(duration = 1000)
+
+map
+
+```
+
+```{r}
+
+temp$Code <- countrycode(sourcevar = temp$Area, origin = "country.name", destination = "iso3c", warn = TRUE)
+temp <- temp %>%
+  group_by(Area,Code,Year) %>%
+  filter(!is.na(Value)) 
+
+map <-temp %>%
+  group_by(Year, Months.Code) %>%
+  e_charts(Area, timeline = TRUE) %>%
+  e_map(Value) %>%
+  e_timeline_opts(autoPlay = TRUE,playInterval = 1) %>%
+  e_visual_map(min= -5, max= 2,
+               type = 'continuous') %>%
+  e_title("Life expectancy by country and year", left = "center") %>%
+  e_tooltip(
+    trigger = "item",
+    formatter = e_tooltip_choro_formatter()) 
+
+map
+
+saveWidget(map, file = "mychart.html")
+
+```
+
+
+```{r}
+
+temp_change_df$dt <- as.Date(temp_change_df$dt,format="%Y-%m-%d")
+temp_change_df <- temp_change_df %>%
+  arrange(dt)
+temp_change_df <- temp_change_df[temp_change_df$dt >= "1950-01-01" & temp_change_df$dt <= "2013-09-01", ]
+temp_change_df$Year <- format(temp_change_df$dt, format="%Y")
+#temp_change_df$code <- countrycode(sourcevar = temp_change_df$Country, origin = "country.name", destination = "iso3c", warn = TRUE)
+
+temp_change_df <- temp_change_df %>% filter(Country=='United States')
+
+temp_change_df <- temp_change_df %>%
+  group_by(State,Year) %>%
+  summarise(AvgTemperature = mean(AverageTemperature)) %>%
+  filter(!is.na(AvgTemperature))
+
+colnames(temp_change_df)[colnames(temp_change_df) == "State"] ="state"
+
+temp_change_df <- temp_change_df %>%
+  inner_join(states_codes, by = 'state') %>%
+  select(Year, state , code, AvgTemperature) %>%
+  mutate(hover = paste(state, AvgTemperature ,"°C"))
+
+fontStyle = list(
+  family = use_font("roboto", "/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/css/roboto.css"),
+  size = 15,
+  color = 'black')
+
+label = list(
+  bgcolor = "#EEEEEE",
+  bordercolor = 'transparent',
+  font = fontStyle
+)
+
+us_temp_graph <- plot_geo(temp_change_df,
+                          locationmode = 'USA-states',
+                          frame = ~Year) %>%
+  add_trace(locations = ~code, 
+            z = ~AvgTemperature,
+            zmin = 0,
+            zmax = max(temp_change_df$AvgTemperature),
+            color = ~AvgTemperature,
+            colors = c(c("#FFFACD","#FF6A6A")),
+            text = ~ hover,
+            hoverinfo = 'text') %>%
+  layout(geo = list(scope='usa'),
+    font = list(family = use_font("roboto", "/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/css/roboto.css")),
+         title = "Average Temperature Change in US \n1850 to 2013")%>%
+  style(hoverlabel = label) %>%
+  config(displayModeBar = FALSE) %>%
+  colorbar(ticksuffix = "°C")
+
+us_temp_graph
+
+help(signup, package = 'plotly')
+Sys.setenv("plotly_username" = "Aarthi03")
+Sys.setenv("plotly_api_key" = "6xvhXNvMscVR8OoR49ol")
+
+chart_url <- api_create(us_temp_graph, filename = "us_temp", fileopt='overwrite')
+chart_url
+
+#fig <- api_download_plot("temp_change.html", "Aarthi03")
+#fig
+#htmlwidgets::saveWidget(us_temp_graph, "temp_change.html", selfcontained = FALSE)
+
+#browseURL("temp_change.html")
+
+
+
+
+
+```
+
+```{r}
+temp <- temp %>%
+  arrange(Year)
+
+temp$code <- countrycode(sourcevar = temp$Area, origin = "country.name", destination = "iso3c", warn = TRUE)
+
+#temp_change_df <- temp_change_df %>% filter(Country=='United States')
+
+temp <- temp %>%
+  group_by(Area,code,Year) %>%
+  summarise(Temperature = mean(Value)) %>%
+  filter(Year>1999)%>%
+  filter(!is.na(Temperature))
+
+colnames(temp_change_df)[colnames(temp_change_df) == "State"] ="state"
+
+temp <- temp %>%
+  #inner_join(states_codes, by = 'state') %>%
+  select(Year, Area , code, Temperature) %>%
+  mutate(hover = paste(Area, Temperature ,"°C"))
+
+fontStyle = list(
+  family = use_font("roboto", "/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/css/roboto.css"),
+  size = 15,
+  color = 'black')
+
+label = list(
+  bgcolor = "#EEEEEE",
+  bordercolor = 'transparent',
+  font = fontStyle
+)
+
+us_temp_graph <- plot_geo(temp,
+                          frame = ~Year) %>%
+  add_trace(locations = ~code, 
+            z = ~Temperature,
+            zmin = min(temp$Temperature),
+            zmax = 5,
+            color = ~Temperature,
+            colors = c("#FFFACD","#FFA07A","#B22222"),
+            text = ~ hover,
+            hoverinfo = 'text') %>%
+  layout(legend=list(title=list(text="Temperature Change")),
+                     font = list(family = use_font("roboto", "/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/css/roboto.css")),
+         title = "Annual Temperature Change in US \n2000 to 2013")%>%
+  style(hoverlabel = label) %>%
+  config(displayModeBar = FALSE) %>%
+  colorbar(ticksuffix = "°C")
+
+us_temp_graph <- us_temp_graph %>% animation_opts(
+    1000, easing = "elastic", redraw = FALSE
+  )
+
+us_temp_graph <- us_temp_graph %>% animation_slider(
+    currentvalue = list(prefix = "YEAR : ", font = list(color="#838B8B"))
+  )
+
+us_temp_graph
+
+help(signup, package = 'plotly')
+Sys.setenv("plotly_username" = "Aarthi03")
+Sys.setenv("plotly_api_key" = "6xvhXNvMscVR8OoR49ol")
+
+chart_url <- api_create(us_temp_graph, filename = "world_temp", fileopt='overwrite')
+chart_url
+
+#fig <- api_download_plot("temp_change.html", "Aarthi03")
+#fig
+#htmlwidgets::saveWidget(us_temp_graph, "temp_change.html", selfcontained = FALSE)
+
+#browseURL("temp_change.html")
+
+```
+
+```{r task2, echo=FALSE}
+
+antar_ice <- antar_ice %>%
+  separate(TIME..year.decimal., into = c('Year', 'decimal'), sep = "\\.") %>%
+  select(-decimal) %>%
+  group_by(Year) %>%
+  summarise(Average_Ice_mass_change = mean(Antarctic.mass..Gigatonnes.))
+
+sea_level <- sea_level %>%
+  separate(year.fraction.of.year, into = c('Year', 'decimal'), sep = "\\.") %>%
+  select(-decimal) %>%
+  group_by(Year) %>%
+  summarise(Yearly_Sea_level_change = mean(GMSL..Global.Isostatic.Adjustment..GIA..not.applied..variation..mm..with.respect.to.20.year.TOPEX.Jason.collinear.mean.referenc)) 
+
+sea_and_ice <- sea_level %>%
+  inner_join(antar_ice, by = 'Year') %>%
+  select(Year, Average_Ice_mass_change, Yearly_Sea_level_change)
+
+write.csv(sea_and_ice,"/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/sea_and_ice_subset.csv",
+          row.names = FALSE)
+
+```
+```{r task3, echo=FALSE}
+
+fossil_fuel_consumption <- fossil_fuel_consumption %>%
+  pivot_wider(names_from = Year, values_from = Fossil.fuels..TWh.growth.) %>%
+  drop_na()
+
+
+fossil_fuel_consumption <- fossil_fuel_consumption %>%
+  filter(Entity !="Asia" & Entity !="North America" &
+        Entity !="South America" & Entity !="Europe" & Entity !="Oceania" &
+    Entity != "High-income countries" & Entity != "Lower-middle-income countries" &
+           Entity != "Non-OECD (BP)" & Entity != "OECD (BP)" &
+           Entity != "South and Central America (BP)" & Entity != "Upper-middle-income countries" &
+           Entity != "World") %>%
+  filter(!str_detect(Entity, '(BP)'))
+
+fossil_fuel_consumption$Entity <- str_replace(fossil_fuel_consumption$Entity, "United States", "USA")
+fossil_fuel_consumption$Entity <- str_replace(fossil_fuel_consumption$Entity, "United Kingdom", "UK")
+
+write.csv(fossil_fuel_consumption,"/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/fossil_fuel_consumption_subset.csv",
+          row.names = FALSE)
+```
+
+```{r task4, echo=FALSE}
+fossil_co2_emissions <- co2_emissions %>%
+  filter(Year>=1990)
+
+deleted_countries <- c("Europe","Europe (GCP)","Europe (excl. EU-27)","Europe (excl. EU-28)","European Union (27)","European Union (27) (GCP)","European Union (28)","Africa (GCP)","Asia","Asia (GCP)","Central America (GCP)","Middle East (GCP)","High-income countries" , "Non-OECD (GCP)","North America", "Non-OECD (GCP)","OECD (GCP)","Upper-middle-income countries","World","South America (GCP)","St. Kitts-Nevis-Anguilla (GCP)","International transport","Lower-middle-income countries","Low-income countries","Middle East (GCP)","Sint Maarten (Dutch part)","Asia","North America")
+
+fossil_co2_emissions <- fossil_co2_emissions[with(fossil_co2_emissions,
+                                           !(Entity %in% deleted_countries)), ] %>%
+  filter(!str_detect(Entity, '(GCP)')) %>%
+  select(Entity,Year,Annual.CO..emissions)
+
+top10_production <- fuel_production %>%
+  arrange(desc(bpd)) %>%
+  select(country) %>%
+  head(10)
+
+top_10_production_amount <- fuel_production %>%
+  arrange(desc(bpd)) %>%
+  select(country,bpd) %>%
+  head(10)
+colnames(top_10_production_amount)[colnames(top_10_production_amount) == "bpd"] ="Barrel per day"
+
+top10_fossil_co2_emissions <- fossil_co2_emissions[with(fossil_co2_emissions,
+                                           (Entity %in% top10_production$country)), ]%>%
+  group_by(Year) %>%
+  summarise(Total = sum(Annual.CO..emissions))
+
+top10_fossil_co2_emissions$Category <- "Top 10"
+
+other_fossil_co2_emissions <- fossil_co2_emissions[with(fossil_co2_emissions,
+                                           !(Entity %in% top10_production$country)), ] %>%
+  group_by(Year) %>%
+  summarise(Total = sum(Annual.CO..emissions))
+
+other_fossil_co2_emissions$Category <- "Others"
+
+fossil_co2_emissions_category <- rbind(top10_fossil_co2_emissions,other_fossil_co2_emissions)
+
+fossil_co2_emissions_category <- fossil_co2_emissions_category %>%
+  pivot_wider(names_from = Category,
+              values_from = Total)
+
+
+write.csv(top_10_production_amount,"/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/top_10_production_amount.csv",
+          row.names = FALSE)
+
+write.csv(fossil_co2_emissions_category,"/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/fossil_co2_emissions_category.csv",
+          row.names = FALSE) 
+
+```
+
+```{r task5, echo=FALSE}
+gdp_change$year <- format(as.Date(gdp_change$DATE, format="%m/%d/%y"),"%Y")
+gdp_change$quarter <- as.numeric(format(as.Date(gdp_change$DATE, format="%m/%d/%y"),"%m"))
+
+gdp_change$quarter[gdp_change$quarter == 1] <- "Q1"
+gdp_change$quarter[gdp_change$quarter == 4] <- "Q2"
+gdp_change$quarter[gdp_change$quarter == 7] <- "Q3"
+gdp_change$quarter[gdp_change$quarter == 10] <- "Q4"
+
+gdp_change <- gdp_change %>%
+  select(Percent.Change.in.US.GDP,year,quarter) %>%
+  pivot_wider(names_from = quarter,
+              values_from = Percent.Change.in.US.GDP)
+
+fontStyle_1 = list(
+  family = use_font("roboto", "/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/css/roboto.css"),
+  size = 15,
+  color = 'black')
+
+fontStyle_2 = list(
+  family = use_font("roboto", "/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/css/roboto.css"),
+  size = 8,
+  color = 'black')
+
+fontStyle_3 <- list(
+  family = use_font("roboto", "/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/css/roboto.css"),
+  size = 13,
+  color = 'black')
+
+fontStyle_4 <- list(
+  family = use_font("roboto", "/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/css/roboto.css"),
+  size = 10,
+  color = 'black')
+  
+
+gdp_plot <- plot_ly(data = gdp_change, x = ~year, y = ~Q1, type = "bar",name = 'Q1',marker = list(color = "#EEDC82"),text = "Q1",
+hovertemplate = paste('<b>%{text}</b><br>',
+                      '<i>Year</i>: %{x}',
+                      '<br><b>% Change</b>: %{y}%<br>')) %>% 
+  add_trace(y = ~Q2, name = 'Q2',marker = list(color = "#8B5742"),text = "Q2",
+            hovertemplate = paste('<b>%{text}</b><br>',
+                                  '<i>Year</i>: %{x}',
+                                  '<br><b>% Change</b>: %{y}%<br>')) %>% 
+  add_trace(y = ~Q3, name = 'Q3',marker = list(color = "#EE9A49"),text = "Q3",
+            hoverinfo = paste('<b>%{text}</b><br>',
+                                  '<i>Year</i>: %{x}',
+                                  '<br><b>% Change</b>: %{y}%<br>')) %>% 
+  add_trace(y = ~Q4, name = 'Q4',marker = list(color = "#CDB38B"),text = "Q4",
+            hoverinfo = paste('<b>%{text}</b><br>',
+                                  '<i>Year</i>: %{x}',
+                                  '<br><b>% Change</b>: %{y}%<br>')) %>% 
+  layout(title=list(text= "Percentage Change in US GDP from 1970-2022", 
+                    font = fontStyle_1,
+                    y = 0.98, x = 0.5, xanchor = "center", yanchor =  "top"),
+    xaxis =  list(tickangle = -90,
+                    tickfont = fontStyle_4,
+                    title="Year",
+                    titlefont = fontStyle_3),
+         yaxis = list(tickfont = fontStyle_4,
+                      title = 'Percentage change in US GDP',
+                      titlefont = fontStyle_3,
+                      tickformat = "%"),
+         barmode = 'group',
+         legend=list(title=list(text="Quarters of Year"),
+         font = fontStyle_2))%>%
+  config(displayModeBar = FALSE)
+
+gdp_plot
+
+help(signup, package = 'plotly')
+Sys.setenv("plotly_username" = "Aarthi03")
+Sys.setenv("plotly_api_key" = "6xvhXNvMscVR8OoR49ol")
+
+chart_url <- api_create(gdp_plot, filename = "us_gdp_change", fileopt='overwrite')
+chart_url
+
+```
+
+```{r task6, echo=FALSE}
+
+avg_deforest <- deforest_change %>%
+  summarise(avg_deforest = mean(Share.of.global.deforestation))
+
+deforest_change_subset <- deforest_change %>%
+  filter(Share.of.global.deforestation > avg_deforest$avg_deforest) %>%
+  filter(Entity != "World") %>%
+  select(Entity,Share.of.global.deforestation,Year) %>%
+  filter(!(Entity %in% c("Bolivia","China","Sudan"))) %>%
+  pivot_wider(names_from = "Entity",
+              values_from = "Share.of.global.deforestation")
+
+write.csv(deforest_change_subset,"/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/deforest_change_subset.csv",
+          row.names = FALSE) 
+```
+
+```{r task7, echo=FALSE}
+food_production
+
+```
+```{r task8, echo=FALSE}
+
+methane_emission <- methane_emission %>% replace(is.na(.), 0)
+
+#trial 2
+methane_emission_subset <- methane_emission %>%
+  filter(Entity == "World") %>%
+  filter(Year %in% c(1990,2019)) %>%
+  group_by(Year) %>%
+  summarise(Agriculture= sum(Agriculture),
+            Fugitive.emissions = sum(Fugitive.emissions),
+            Waste = sum(Waste),
+            Land.use.change.and.forestry = sum(Land.use.change.and.forestry),
+            Industry = sum(Industry),
+            Other.fuel.combustion = sum(Other.fuel.combustion)) %>%
+  pivot_longer(cols=(Agriculture:Other.fuel.combustion),
+                names_to = "Sector",
+               values_to = "CH4 Emissions") %>%
+  pivot_wider(names_from = Year,
+              values_from = "CH4 Emissions")
+
+no2_emission_subset <- no2_emission %>%
+  filter(Entity == "World") %>%
+  filter(Year %in% c(1990,2019)) %>%
+  group_by(Year) %>%
+  summarise(Agriculture= sum(Agriculture),
+            Fugitive.emissions = sum(Fugitive.emissions),
+            Waste = sum(Waste),
+            Land.use.change.and.forestry = sum(Land.use.change.and.forestry),
+            Industry = sum(Industry),
+            Other.fuel.combustion = sum(Other.fuel.combustion)) %>%
+  pivot_longer(cols=(Agriculture:Other.fuel.combustion),
+                names_to = "Sector",
+               values_to = "NO2 Emissions") %>%
+  pivot_wider(names_from = Year,
+              values_from = "NO2 Emissions")
+
+write.csv(methane_emission_subset,"/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/methane_emission_subset.csv",
+          row.names = FALSE) 
+write.csv(no2_emission_subset,"/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/no2_emission_subset.csv",
+          row.names = FALSE) 
+```
+
+```{r  task9, echo=FALSE}
+
+death_by_disease_subset <- death_by_disease %>%
+  filter(Entity == "World") %>%
+  filter(Year %in% c(1990,2010,2019))
+
+colnames(death_by_disease_subset)<-gsub("...Sex..Both...Age..All.Ages..Number.","",colnames(death_by_disease_subset))
+names(death_by_disease_subset) <- sub('^Deaths...Cause..All.causes...Risk..', '', names(death_by_disease_subset))
+
+death_by_disease_subset <- subset(death_by_disease_subset,select=-c(Air.pollution,Unsafe.sex,
+                                                       Discontinued.breastfeeding,Non.exclusive.breastfeeding,
+                                                      Low.bone.mineral.density,Vitamin.A.deficiency,Iron.deficiency))
+
+colnames(death_by_disease_subset)[colnames(death_by_disease_subset) == "Outdoor.air.pollution...OWID"] ="Outdoor.air.pollution"
+
+death_by_disease_subset <- death_by_disease_subset %>%
+  pivot_longer(cols = Outdoor.air.pollution:Child.stunting,
+               names_to = "Risk Factor",
+               values_to = "Number_of_Deaths") %>%
+  arrange(desc(Number_of_Deaths)) %>%
+  pivot_wider(names_from = Year,
+              values_from = Number_of_Deaths)
+
+death_by_disease_subset <- subset(death_by_disease_subset,select=-c(Entity,Code))
+
+death_by_disease_subset <- death_by_disease_subset %>%
+   arrange(desc(2019))
+
+write.csv(death_by_disease_subset,"/Users/Hp/Desktop/Semester_2/Comp_Viz/Project 1 - Idea/death_by_disease_subset.csv",
+          row.names = FALSE) 
+
+```
+
